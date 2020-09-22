@@ -1,0 +1,87 @@
+---
+title: "Machine Learning, Self Movement Data Analisys Report"
+author: "Damian"
+date: "9/20/2020"
+output: html_document
+---
+DATA PROCESSING
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+
+#DATA LOADING
+trainRaw <- read.csv("./data/pml-training.csv")
+testRaw <- read.csv("./data/pml-testing.csv")
+dim(trainRaw)
+dim(testRaw)
+
+#DATA CLEANING
+sum(complete.cases(trainRaw))
+trainRaw <- trainRaw[, colSums(is.na(trainRaw)) == 0] 
+testRaw <- testRaw[, colSums(is.na(testRaw)) == 0] 
+knitr::opts_chunk$set(echo = TRUE)
+classe <- trainRaw$classe
+trainRemove <- grepl("^X|timestamp|window", names(trainRaw))
+trainRaw <- trainRaw[, !trainRemove]
+trainCleaned <- trainRaw[, sapply(trainRaw, is.numeric)]
+trainCleaned$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(testRaw))
+testRaw <- testRaw[, !testRemove]
+testCleaned <- testRaw[, sapply(testRaw, is.numeric)]
+#SPLITTING DATA
+set.seed(55291) # For reproducibile purpose
+inTrain <- createDataPartition(trainCleaned$classe, p=0.70, list=F)
+trainData <- trainCleaned[inTrain, ]
+testData <- trainCleaned[-inTrain, ]
+```
+
+DATA MODELING
+
+```{r Modeling, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+controlRf <- trainControl(method="cv", 5)
+modelRf <- train(classe ~ ., data=trainData, method="rf", trControl=controlRf, ntree=250)
+modelRf
+
+#Model performace evaluation
+predictRf <- predict(modelRf, testData)
+confusionMatrix(factor(testData$classe), factor(predictRf))
+
+accuracy <- postResample(factor(predictRf), factor(testData$classe))
+accuracy
+
+oose <- 1 - as.numeric(confusionMatrix(factor(testData$classe), factor(predictRf))$overall[1])
+oose
+
+```
+DATA SET TEST PREDICTION
+
+```{r prediction, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+result <- predict(modelRf, testCleaned[, -length(names(testCleaned))])
+result
+
+```
+
+FIGURES
+
+```{r figures, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Correlation Matrix Visualization
+corrPlot <- cor(trainData[, -length(names(trainData))])
+corrplot(corrPlot, method="color")
+
+#Tree Visualization
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeModel)
+
+```
